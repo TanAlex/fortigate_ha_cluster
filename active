@@ -1,0 +1,105 @@
+config sys glo
+set hostname active
+end
+config system interface
+    edit port1
+        set mode dhcp
+        set allowaccess ping https ssh http fgfm
+        set description "ext"
+    next
+    edit port2
+        set mode dhcp
+        set allowaccess ping https ssh http
+        set description "int"
+    next
+    edit port3
+        set mode static
+        set ip ${active_port3_ip}/${active_port3_mask}
+        set allowaccess ping https ssh http fgfm
+        set description "sync"
+    next
+    edit port4
+        set mode static
+        set ip ${active_port4_ip}/${active_port4_mask}
+        set allowaccess ping https ssh http fgfm
+        set description "hamgmt"
+    next
+end
+# Firewall
+config firewall policy
+    edit 1
+        set name "port2-all"
+        set srcintf "port2"
+        set dstintf "port1"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+    next
+    edit 2
+        set name "port1-all"
+        set srcintf "port1"
+        set dstintf "port2"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+    next
+end
+# Router Policy
+config router policy
+    edit 1
+        set input-device "port2"
+        set src "0.0.0.0/0.0.0.0"
+        set dst "172.16.0.0/255.255.255.0"
+        set output-device "port1"
+    next
+    edit 2
+        set input-device "port1"
+        set src "0.0.0.0/0.0.0.0"
+        set dst "172.16.1.0/255.255.255.0"
+        set output-device "port2"
+    next
+end
+config system ha
+    set group-name "group1"
+    set mode a-p
+    set hbdev "port3" 50
+    set session-pickup enable
+    set ha-mgmt-status enable
+    config ha-mgmt-interfaces
+        edit 1
+            set interface "port4"
+            set gateway ${hamgmt_gateway_ip}
+        next
+    end
+    set override disable
+    set priority 255
+    set unicast-hb enable
+    set unicast-hb-peerip ${passive_hb_ip}
+    set unicast-hb-netmask ${hb_netmask}
+end
+#config router static
+#    edit 1
+#       set device port1
+#       set gateway ${port1_gateway}
+#    next
+#end
+config system sdn-connector
+    edit "gcp"
+        set type gcp
+        set ha-status enable
+        config external-ip
+            edit ${clusterip}
+            next
+        end
+        config route
+            edit ${internalroute1}
+            next
+            edit ${internalroute0}
+            next
+        end
+    next
+end
